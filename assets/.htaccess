@@ -1,0 +1,20 @@
+# ==============================================================================
+# Security Defense-in-Depth for Assets Directory
+# Disable script execution & deny executable files
+# ==============================================================================
+
+# 1. Disable PHP script engine inside assets
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule php8_module>
+    php_flag engine off
+</IfModule>
+
+# 2. Block all executable script extensions
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|php8|phps|pl|py|cgi|sh|bash|exe|bat)$">
+    Require all denied
+</FilesMatch>
+
+# 3. Disable directory browsing
+Options -Indexes -ExecCGI

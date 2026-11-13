@@ -1,0 +1,135 @@
+# BEGIN cPanel-generated php ini directives, do not edit
+# Manual editing of this file may result in unexpected behavior.
+# To make changes to this file, use the cPanel MultiPHP INI Editor (Home >> Software >> MultiPHP INI Editor)
+# For more information, read our documentation (https://go.cpanel.net/EA4ModifyINI)
+<IfModule php8_module>
+   php_value error_log "/home/ptsatyaj/logs/php.error.log"
+   php_flag log_errors On
+</IfModule>
+<IfModule lsapi_module>
+   php_value error_log "/home/ptsatyaj/logs/php.error.log"
+   php_flag log_errors On
+</IfModule>
+# END cPanel-generated php ini directives, do not edit
+
+# ==============================================================================
+# PT SATYA JAYA RAHARJA - Production Security & Performance Hardening
+# Static Company Profile Architecture
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Server Hardening & Information Disclosure Prevention
+# ------------------------------------------------------------------------------
+# Disable directory listing and server-side content negotiation
+Options -Indexes -MultiViews
+
+# Suppress web server version and OS banners in headers and error pages
+ServerSignature Off
+
+# Restrict HTTP methods to only safe verbs required for static company profile
+<LimitExcept GET POST HEAD>
+    Require all denied
+</LimitExcept>
+
+# ------------------------------------------------------------------------------
+# 2. URL Rewriting, HTTPS Enforcement & Malicious Query Filtering
+# ------------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Enforce HTTPS (compatible with direct SSL and reverse proxies/Cloudflare)
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+    # Block directory traversal attempts (../ or ..\)
+    RewriteCond %{QUERY_STRING} (\.\./|\.\.\\) [NC,OR]
+    # Block SQL Injection probing attempts
+    RewriteCond %{QUERY_STRING} (union.*select|insert.*into|drop.*table|benchmark\(|waitfor.*delay) [NC,OR]
+    # Block remote script inclusion / XSS probing patterns
+    RewriteCond %{QUERY_STRING} (base64_encode|base64_decode|<script|%3Cscript|globals|mosconfig) [NC,OR]
+    # Block command execution probes
+    RewriteCond %{QUERY_STRING} (\b(cmd|exec|passthru|shell_exec|system)\b) [NC]
+    RewriteRule ^ - [F,L]
+
+    # Block access to hidden dotfiles/folders (except .well-known for ACME SSL cert renewal)
+    RewriteRule (^|/)\.(?!well-known/) - [F,L,NC]
+
+    # Block sensitive system, config, and repository files
+    RewriteRule ^(server\.js|package(-lock)?\.json|README\.md|\.env|\.user\.ini|composer\.(json|lock))(/.*)?$ - [F,L,NC]
+    RewriteRule ^(node_modules|\.git|backend)(/.*)?$ - [F,L,NC]
+
+    # Block sensitive file extensions (database, backup, logs, scripts, configs)
+    RewriteRule \.(sqlite|sqlite3|log|bak|old|sql|ini|conf|config|sh|bash|env|yml|yaml|dist)$ - [F,L,NC]
+</IfModule>
+
+# Prevent direct access to hidden files and sensitive extensions via FilesMatch
+<FilesMatch "(^\.|\.(sqlite|sqlite3|log|bak|old|sql|ini|conf|config|sh|env|yml|yaml|md|json)$)">
+    <If "%{REQUEST_URI} !~ m#/\.well-known/#">
+        Require all denied
+    </If>
+</FilesMatch>
+
+# ------------------------------------------------------------------------------
+# 3. HTTP Security Headers (OWASP & Best Practices Hardening)
+# ------------------------------------------------------------------------------
+<IfModule mod_headers.c>
+    # Prevent MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Prevent Clickjacking (legacy fallback for older browsers)
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Referrer Policy: Send referrer only on same-origin or HTTPS to HTTPS
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Permissions Policy: Disable unused device sensors and browser hardware APIs
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), display-capture=(), midi=()"
+
+    # HTTP Strict Transport Security (HSTS): 1 Year, covers subdomains, preload-ready
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+    # Content Security Policy (CSP): Strictly restrict execution and resources
+    Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; media-src 'self'; frame-src https://www.google.com https://maps.google.com; form-action 'self' https://wa.me; frame-ancestors 'self'; upgrade-insecure-requests"
+
+    # Cross-Origin Isolation Policies
+    Header always set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+    Header always set Cross-Origin-Resource-Policy "same-origin"
+
+    # Cache Control: Revalidate HTML immediately, cache static assets efficiently
+    <FilesMatch "\.(html)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    <FilesMatch "\.(css|js)$">
+        Header set Cache-Control "public, max-age=604800, immutable"
+    </FilesMatch>
+
+    <FilesMatch "\.(png|jpe?g|webp|gif|svg|ico|mp4)$">
+        Header set Cache-Control "public, max-age=2592000, immutable"
+    </FilesMatch>
+</IfModule>
+
+# ------------------------------------------------------------------------------
+# 4. Gzip / Deflate Compression
+# ------------------------------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# ------------------------------------------------------------------------------
+# 5. Browser Caching Expirations
+# ------------------------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/html "access plus 0 seconds"
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType video/mp4 "access plus 30 days"
+</IfModule>
